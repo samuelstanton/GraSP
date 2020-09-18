@@ -7,14 +7,14 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
-from models.model_base import ModelBase
+from grasp.models import ModelBase
 from tensorboardX import SummaryWriter
 from tqdm import tqdm
-from models.base.init_utils import weights_init
-from utils.common_utils import (get_logger, makedirs, process_config, PresetLRScheduler, str_to_list)
-from utils.data_utils import get_dataloader
-from utils.network_utils import get_network
-from pruner.GraSP import GraSP
+from grasp.models import weights_init
+from grasp.utils import (get_logger, makedirs, process_config, PresetLRScheduler, str_to_list, try_cuda)
+from grasp.utils.data_utils import get_dataloader
+from grasp.utils.network_utils import get_network
+from grasp.pruner import GraSP
 
 
 def get_args():
@@ -110,7 +110,7 @@ def train(net, loader, optimizer, criterion, lr_scheduler, epoch, writer, iterat
 
     prog_bar = tqdm(enumerate(loader), total=len(loader), desc=desc, leave=True)
     for batch_idx, (inputs, targets) in prog_bar:
-        inputs, targets = inputs.cuda(), targets.cuda()
+        inputs, targets = try_cuda(inputs), try_cuda(targets)
         optimizer.zero_grad()
         outputs = net(inputs)
         loss = criterion(outputs, targets)
@@ -142,7 +142,7 @@ def test(net, loader, criterion, epoch, writer, iteration):
     prog_bar = tqdm(enumerate(loader), total=len(loader), desc=desc, leave=True)
     with torch.no_grad():
         for batch_idx, (inputs, targets) in prog_bar:
-            inputs, targets = inputs.cuda(), targets.cuda()
+            inputs, targets = try_cuda(inputs), try_cuda(targets)
             outputs = net(inputs)
             loss = criterion(outputs, targets)
 
@@ -223,7 +223,7 @@ def main(config):
     model = get_network(config.network, config.depth, config.dataset, use_bn=config.get('use_bn', True))
     mask = None
     mb = ModelBase(config.network, config.depth, config.dataset, model)
-    mb.cuda()
+    mb = try_cuda(mb)
     if mask is not None:
         mb.register_mask(mask)
         print_mask_information(mb, logger)
@@ -268,7 +268,8 @@ def main(config):
         mb.model.apply(weights_init)
         print("=> Applying weight initialization(%s)." % config.get('init_method', 'kaiming'))
         print("Iteration of: %d/%d" % (iteration, num_iterations))
-        masks = GraSP(mb.model, ratio, trainloader, 'cuda',
+        device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        masks = GraSP(mb.model, ratio, trainloader, device,
                       num_classes=classes[config.dataset],
                       samples_per_class=config.samples_per_class,
                       num_iters=config.get('num_iters', 1))

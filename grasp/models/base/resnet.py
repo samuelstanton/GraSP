@@ -1,9 +1,5 @@
-import math
-import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import torch.nn.init as init
-from utils.common_utils import try_cuda
 from .init_utils import weights_init
 
 __all__ = ['resnet']  # , 'resnet20', 'resnet32', 'resnet44', 'resnet56', 'resnet110', 'resnet1202']

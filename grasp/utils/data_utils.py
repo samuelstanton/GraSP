@@ -68,11 +68,26 @@ def get_transforms(dataset):
             transforms.ToTensor(),
             transforms.Normalize(tiny_mean, tiny_std)])
 
+    if dataset == 'imagenet':
+        normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                         std=[0.229, 0.224, 0.225])
+        transform_train = transforms.Compose([
+                transforms.RandomResizedCrop(224),
+                transforms.RandomHorizontalFlip(),
+                transforms.ToTensor(),
+                normalize,
+            ])
+
+        transform_test = transforms.Compose([
+            transforms.ToTensor(),
+            normalize
+        ])
+
     assert transform_test is not None and transform_train is not None, 'Error, no dataset %s' % dataset
     return transform_train, transform_test
 
 
-def get_dataloader(dataset, train_batch_size, test_batch_size, num_workers=2, root='../data'):
+def get_dataloader(dataset, train_batch_size, test_batch_size, num_workers=2, root='../data', subsample_ratio=1.0):
     transform_train, transform_test = get_transforms(dataset)
     trainset, testset = None, None
     if dataset == 'mnist':
@@ -96,7 +111,19 @@ def get_dataloader(dataset, train_batch_size, test_batch_size, num_workers=2, ro
         trainset = torchvision.datasets.ImageFolder(root + '/tiny_imagenet/train', transform=transform_train)
         testset = torchvision.datasets.ImageFolder(root + '/tiny_imagenet/val', transform=transform_test)
 
+    if dataset == 'imagenet':
+        num_workers = 16
+        trainset = torchvision.datasets.ImageFolder(root + '/ImageNet/train', transform=transform_train)
+        testset = torchvision.datasets.ImageFolder(root + '/ImageNet/val', transform=transform_test)
+
     assert trainset is not None and testset is not None, 'Error, no dataset %s' % dataset
+
+    if subsample_ratio < 1.0:
+        num_train = int(len(trainset) * subsample_ratio)
+        num_unused = len(trainset) - num_train
+        assert num_train > 0
+        trainset, _ = torch.utils.data.random_split(trainset, [num_train, num_unused])
+
     trainloader = torch.utils.data.DataLoader(trainset, batch_size=train_batch_size, shuffle=True,
                                               num_workers=num_workers)
     testloader = torch.utils.data.DataLoader(testset, batch_size=test_batch_size, shuffle=False,

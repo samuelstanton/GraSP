@@ -1,5 +1,6 @@
-from models.base import (VGG,
-                         resnet)
+from grasp.models.base.vgg import VGG
+from grasp.models.base.resnet import resnet
+from grasp.models.base.graphnet import graphnet
 
 
 def get_network(network, depth, dataset, use_bn=True):
@@ -8,6 +9,8 @@ def get_network(network, depth, dataset, use_bn=True):
         return VGG(depth=depth, dataset=dataset, batchnorm=use_bn)
     elif network == 'resnet':
         return resnet(depth=depth, dataset=dataset)
+    elif network == 'graphnet':
+        return graphnet(depth, dataset)
     else:
         raise NotImplementedError('Network unsupported ' + network)
 

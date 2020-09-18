@@ -7,6 +7,40 @@ import torch
 
 from pprint import pprint
 from easydict import EasyDict as edict
+import yaml
+
+
+def save_state(net, acc, epoch, loss, config, ckpt_path, is_best=False):
+    print('Saving..')
+    state = {
+        'net': net,
+        'acc': acc,
+        'epoch': epoch,
+        'loss': loss,
+        'args': config
+    }
+    if not is_best:
+        torch.save(state, '%s/pruned_%s_%s%s_%d.t7' % (ckpt_path,
+                                                       config.dataset,
+                                                       config.network,
+                                                       config.depth,
+                                                       epoch))
+    else:
+        torch.save(state, '%s/finetuned_%s_%s%s_best.t7' % (ckpt_path,
+                                                            config.dataset,
+                                                            config.network,
+                                                            config.depth))
+
+
+def get_exception_layers(net, exception):
+    exc = []
+    idx = 0
+    for m in net.modules():
+        if isinstance(m, (torch.nn.Linear, torch.nn.Conv2d)):
+            if idx in exception:
+                exc.append(m)
+            idx += 1
+    return tuple(exc)
 
 
 def get_logger(name, logpath, filepath, package_files=[],
@@ -43,9 +77,21 @@ def makedirs(filename):
 def str_to_list(src, delimiter, converter):
     """Conver a string to list.
     """
-    src_split = src.split(delimiter)
-    res = [converter(_) for _ in src_split]
+    if isinstance(src, int):
+        return [src]
+    if isinstance(src, float):
+        return [src]
+    elif isinstance(src, str):
+        src_split = src.split(delimiter)
+        res = [converter(_) for _ in src_split]
     return res
+
+
+def get_config_from_yaml(yaml_file):
+    with open(yaml_file, 'r') as config_file:
+        config_dict = yaml.full_load(config_file)
+    config = edict(config_dict)
+    return config, config_dict
 
 
 def get_config_from_json(json_file):
@@ -62,13 +108,19 @@ def get_config_from_json(json_file):
     return config, config_dict
 
 
-def process_config(json_file, runs=None):
+def process_config(config_file, runs=None):
     """Process a json file into a config file.
     Where we can access the value using .xxx
     Note: we will need to create a similar directory as the config file.
     """
-    config, _ = get_config_from_json(json_file)
-    paths = json_file.split('/')[1:-1]
+    config_type = config_file.split('.')[-1]
+    if config_type == 'json':
+        config, _ = get_config_from_json(config_file)
+    elif config_type == 'yaml':
+        config, _ = get_config_from_yaml(config_file)
+    else:
+        raise RuntimeError('unsupported config file extension, must be yaml or json')
+    paths = config_file.split('/')[1:-1]
 
     summn = [config.exp_name]
     chekn = [config.exp_name]

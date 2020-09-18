@@ -3,11 +3,11 @@ import os
 import torch
 import torch.nn as nn
 
-from models.model_base import ModelBase
+from grasp.models import ModelBase
 from tensorboardX import SummaryWriter
-from models.base.init_utils import weights_init
-from utils.common_utils import (get_logger, makedirs, process_config, str_to_list)
-from pruner.GraSP_ImageNet import GraSP
+from grasp.models import weights_init
+from grasp.utils import (get_logger, makedirs, process_config, str_to_list, try_cuda)
+from grasp.pruner import GraSP
 import torchvision.models as models
 import torchvision.transforms as transforms
 import torchvision.datasets as datasets
@@ -79,7 +79,7 @@ def main(config):
     # build model
     model = models.__dict__[config.network]()
     mb = ModelBase(config.network, config.depth, config.dataset, model)
-    mb.cuda()
+    try_cuda(mb)
 
     # preprocessing
     # ====================================== fetch configs ======================================

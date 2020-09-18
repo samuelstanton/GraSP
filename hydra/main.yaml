@@ -1,0 +1,39 @@
+project_name: GraSP
+
+# Multi-Node BatchExperiments
+hostfile:
+num_gpus:
+num_cpus:
+
+network: graphnet
+depth: 20
+dataset: cifar10
+subsample_ratio: 1.0
+batch_size: 128
+num_epochs: 160
+learning_rate: 0.1
+weight_decay: 1e-4
+exception: -1
+iterations: 1
+target_op_ratio: 0.75
+target_weight_ratio: 0.90
+op_pruner: GraSP
+pruner: GraSP
+pruner_file: GraSP
+samples_per_class: 8
+
+trial_id: 0
+seed:
+
+logger: s3
+exp_name: ${dataset}_${network}${depth}_op_ratio_${target_op_ratio}_weight_ratio_${target_weight_ratio}
+data_dir: data
+log_dir: data/experiments/${exp_name}/trial_${trial_id}/${now:%Y-%m-%d_%H-%M-%S}
+checkpoint_dir: ${log_dir}/checkpoints
+
+s3_bucket: mnemosyne-team-bucket
+s3_path: SamuelS/GraSP/${log_dir}
+
+hydra:
+  run:
+    dir: ./${log_dir}

@@ -1,7 +1,9 @@
 import torch.nn as nn
 from collections import OrderedDict
-from utils.network_utils import get_network
-from utils.prune_utils import filter_weights
+from grasp.utils.network_utils import get_network
+from grasp.utils.prune_utils import filter_weights
+from grasp.models.base.graph_utils import GraphEdge
+from grasp.models.base.primitive_ops import Identity
 
 
 class ModelBase(object):
@@ -18,22 +20,51 @@ class ModelBase(object):
     def get_ratio_at_each_layer(self):
         assert self.masks is not None, 'Masks should be generated first.'
         res = dict()
-        total = 0
+        total_weights, total_params = 0, 0
         remained = 0
         # for m in self.masks.keys():
         for m in self.model.modules():
-            if isinstance(m, (nn.Linear, nn.Conv2d)):
+            if isinstance(m, (nn.Linear, nn.Conv2d, GraphEdge)):
                 mask = self.masks.get(m, None)
                 if mask is not None:
                     res[m] = (mask.sum() / mask.numel()).item() * 100
-                    total += mask.numel()
+                    total_weights += mask.numel()
                     remained += mask.sum().item()
                 else:
-                    res[m] = -100.0
-                    total += m.weight.numel()
+                    res[m] = 100.0
+                    total_weights += m.weight.numel()
                     remained += m.weight.numel()
-        res['ratio'] = remained/total * 100
+            if hasattr(m, 'bias'):
+                if m.bias is not None:
+                    total_params += m.bias.numel()
+        total_params += total_weights
+
+        res['ratio'] = remained/total_weights * 100
+        res['total_weights'] = total_weights
+        res['total_params'] = total_params
+        res['remaining_params'] = remained
         return res
+
+    @property
+    def num_params(self):
+        num_params = 0
+        for m in self.model.modules():
+            if hasattr(m, 'weight'):
+                if m.weight is not None:
+                    num_params += m.weight.numel()
+            if hasattr(m, 'bias'):
+                if m.bias is not None:
+                    num_params += m.bias.numel()
+        return num_params
+
+    @property
+    def num_ops(self):
+        num_layers = 0
+        op_classes = (nn.Linear, nn.Conv2d, nn.AvgPool2d, Identity)
+        for m in self.model.modules():
+            if isinstance(m, op_classes):
+                num_layers += 1
+        return num_layers
 
     def get_unmasked_weights(self):
         """Return the weights that are unmasked.

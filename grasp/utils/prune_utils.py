@@ -2,8 +2,17 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch import autograd
 
 from .common_utils import try_contiguous
+
+
+def get_gradients(output, weights, allow_unused, create_graph):
+    grads = list(autograd.grad(output, weights, allow_unused=allow_unused, create_graph=create_graph))
+    for i, weight in enumerate(weights):
+        if grads[i] is None:
+            grads[i] = torch.zeros_like(weight)
+    return grads
 
 
 def _fetch_weights_collections(scores, _prev_masks):

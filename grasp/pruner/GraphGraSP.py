@@ -2,10 +2,12 @@ import torch
 import torch.autograd as autograd
 import torch.nn as nn
 import torch.nn.functional as F
-import math
 
 import copy
-import types
+from collections import OrderedDict
+
+from grasp.models.base.graph_utils import GraphLayer, GraphEdge
+from grasp.models.base.graphnet import get_rand_op_masks
 
 
 def GraSP_fetch_data(dataloader, num_classes, samples_per_class):
@@ -46,7 +48,7 @@ def count_fc_parameters(net):
     return total
 
 
-def GraSP(net, ratio, train_dataloader, device, num_classes=10, samples_per_class=25, num_iters=1, T=200, reinit=True):
+def GraphGraSP(net, ratio, train_dataloader, device, num_classes=10, samples_per_class=25, num_iters=1, T=200, reinit=True):
     eps = 1e-10
     keep_ratio = 1-ratio
     old_net = net
@@ -60,9 +62,7 @@ def GraSP(net, ratio, train_dataloader, device, num_classes=10, samples_per_clas
 
     # rescale_weights(net)
     for layer in net.modules():
-        if isinstance(layer, nn.Conv2d) or isinstance(layer, nn.Linear):
-            if isinstance(layer, nn.Linear) and reinit:
-                nn.init.xavier_normal(layer.weight)
+        if isinstance(layer, GraphEdge):
             weights.append(layer.weight)
 
     inputs_one = []
@@ -128,15 +128,15 @@ def GraSP(net, ratio, train_dataloader, device, num_classes=10, samples_per_clas
         z = 0
         count = 0
         for layer in net.modules():
-            if isinstance(layer, nn.Conv2d) or isinstance(layer, nn.Linear):
+            if isinstance(layer, GraphEdge):
                 z += (grad_w[count].data * grad_f[count]).sum()
                 count += 1
         z.backward()
 
-    grads = dict()
+    grads = OrderedDict()
     old_modules = list(old_net.modules())
     for idx, layer in enumerate(net.modules()):
-        if isinstance(layer, nn.Conv2d) or isinstance(layer, nn.Linear):
+        if isinstance(layer, GraphEdge):
             grads[old_modules[idx]] = -layer.weight.data * layer.weight.grad  # -theta_q Hg
 
     # Gather all scores in a single vector and normalise
@@ -147,13 +147,40 @@ def GraSP(net, ratio, train_dataloader, device, num_classes=10, samples_per_clas
 
     num_params_to_rm = int(len(all_scores) * (1-keep_ratio))
     threshold, _ = torch.topk(all_scores, num_params_to_rm, sorted=True)
-    # import pdb; pdb.set_trace()
     acceptable_score = threshold[-1]
     print('** accept: ', acceptable_score)
-    keep_masks = dict()
+    keep_masks = OrderedDict()
     for m, g in grads.items():
         keep_masks[m] = ((g / norm_factor) <= acceptable_score).float()
 
     print(torch.sum(torch.cat([torch.flatten(x == 1) for x in keep_masks.values()])))
 
     return keep_masks
+
+
+def prune_ops(config, mb, trainloader, num_classes):
+    num_iterations = config.iterations
+    target_ratio = config.target_op_ratio
+    ratio = 1 - (1 - target_ratio) ** (1.0 / num_iterations)
+    # ====================================== start pruning ======================================
+    if config.op_pruner.lower() == 'grasp':
+        for iteration in range(1):
+            print("Iteration of: %d/%d" % (iteration + 1, num_iterations))
+            device = 'cuda' if torch.cuda.is_available() else 'cpu'
+            from grasp.pruner.GraSP import GraSP
+            masks = GraSP(mb.model, ratio, trainloader, device,
+                          num_classes=num_classes,
+                          samples_per_class=config.samples_per_class,
+                          num_iters=config.get('num_iters', 1),
+                          mode='prune_ops')
+    elif config.op_pruner == 'random':
+        masks = get_rand_op_masks(mb.model, config.target_op_ratio)
+    else:
+        raise RuntimeError("unrecognized operation pruner")
+    masks = copy.deepcopy(masks)
+    for layer in mb.model.modules():
+        if isinstance(layer, GraphLayer):
+            edge_masks = [masks.popitem()[1].bool() for _ in layer.edges]
+            layer.sparsify(edge_masks)
+    return mb
+
