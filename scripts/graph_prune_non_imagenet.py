@@ -12,8 +12,10 @@ from grasp.utils.common_utils import (try_cuda)
 from grasp.utils.data_utils import get_dataloader
 from grasp.utils.network_utils import get_network
 from grasp.pruner.GraphGraSP import prune_ops
-from grasp.pruner.GraSP import prune_weights
+from grasp.pruner.GraSP import prune_weights, get_grad_norm
 from grasp.boilerplate import training_loop
+from grasp.models.base.graphnet import GraphNet
+from grasp.models.base.graph_utils import GraphEdge
 
 
 def init_s3_logger(config):
@@ -50,22 +52,35 @@ def main(config):
     data_dir = os.path.normpath(data_dir)
     trainloader, testloader = get_dataloader(config.dataset, config.batch_size, 256, 4, data_dir, config.subsample_ratio)
 
-    # ========== get initial metrics =================
+    print("==== computing initial metrics ====")
     s3_logger.add_table('pruning_metrics')
-    s3_logger.log(dict(num_params=mb.num_params, num_ops=mb.num_ops), 'init', 'pruning_metrics')
+    # abs_grad_norm = get_grad_norm(mb.model, trainloader.dataset)
+    rel_grad_norm = 1.
+    s3_logger.log(dict(num_params=mb.num_params, num_ops=mb.num_ops, grad_norm=rel_grad_norm),
+                  'init', 'pruning_metrics')
 
-    print("========== pruning ops ========================")
-    mb = prune_ops(config, mb, trainloader, classes[config.dataset])
-    s3_logger.log(dict(num_params=mb.num_params, num_ops=mb.num_ops), 'prune_ops', 'pruning_metrics')
+    print("==== pruning ops ====")
+    if config.target_op_ratio > 0. and isinstance(mb.model, GraphNet):
+        mb = prune_ops(config, mb, trainloader, classes[config.dataset])
+        # rel_grad_norm = get_grad_norm(mb.model, trainloader.dataset, norm_factor=abs_grad_norm)
+    s3_logger.log(dict(num_params=mb.num_params, num_ops=mb.num_ops, grad_norm=rel_grad_norm),
+                  'prune_ops', 'pruning_metrics')
 
-    print("========== pruning weights ====================")
-    mb = prune_weights(config, mb, trainloader, classes[config.dataset])
+    print("==== pruning weights ====")
+    if config.target_weight_ratio > 0.:
+        mb = prune_weights(config, mb, trainloader, classes[config.dataset])
+        # rel_grad_norm = get_grad_norm(mb.model, trainloader.dataset, norm_factor=abs_grad_norm)
     prune_metrics = mb.get_ratio_at_each_layer()
-    s3_logger.log(dict(num_params=prune_metrics['remaining_params'], num_ops=mb.num_ops),
+    s3_logger.log(dict(num_params=prune_metrics['remaining_params'], num_ops=mb.num_ops, grad_norm=rel_grad_norm),
                   'prune_weights', 'pruning_metrics')
 
     print(pd.DataFrame(s3_logger.data['pruning_metrics']).to_markdown())
     s3_logger.write_csv()
+
+    # keep operation weights fixed at initialization
+    # for m in mb.model.modules():
+    #     if isinstance(m, GraphEdge):
+    #         m.weight.requires_grad_(False)
 
     # ========== finetuning =======================
     training_loop(

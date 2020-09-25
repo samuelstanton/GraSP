@@ -20,7 +20,8 @@ target_weight_ratio: 0.90
 op_pruner: GraSP
 pruner: GraSP
 pruner_file: GraSP
-samples_per_class: 8
+samples_per_class: 10
+view_graphs: False
 
 trial_id: 0
 seed:

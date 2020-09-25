@@ -33,5 +33,5 @@ def train_epoch(net, loader, optimizer, criterion, lr_scheduler, epoch):
         prog_bar.set_description(desc, refresh=True)
 
     avg_loss = train_loss / (batch_idx + 1)
-    train_acc = 100. * correct / total
+    train_acc = 100 * correct / total
     return avg_loss, train_acc

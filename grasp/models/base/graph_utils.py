@@ -1,6 +1,7 @@
+import os
 import math
 import torch
-
+from graphviz import Digraph
 
 class GraphNode(object):
     """Simple aggregation op"""
@@ -25,7 +26,7 @@ class GraphEdge(torch.nn.Module):
 
     def forward(self, node_features):
         edge_features = torch.stack([
-            weight * op(node_features) for weight, op in zip(self.weight, self.op_modules)
+            weight * op(node_features) for weight, op in zip(self.weight.exp(), self.op_modules)
         ])
         return edge_features.sum(0)
 
@@ -78,10 +79,12 @@ class GraphLayer(torch.nn.Module):
     def _init_op_weights(self):
         for tail_node_idx, head_edge_tuple in self.adj_dict.items():
             tail_node = self.nodes[tail_node_idx]
-            stdv = 1. /math.sqrt(tail_node.in_degree)
+            stdv = 1. / math.sqrt(self.num_ops)
             for _, edge_idx in head_edge_tuple:
                 edge = self.edges[edge_idx]
-                edge.weight.data.uniform_(-stdv, stdv)
+                # edge.weight.data.uniform_(-stdv, stdv)
+                edge.weight.data.uniform_(-1, 0)
+                # edge.weight.data = torch.ones_like(edge.weight) / tail_node.in_degree
 
     def forward(self, inputs):
         node_features = [self.nodes[0]([inputs])]
@@ -127,6 +130,17 @@ class GraphLayer(torch.nn.Module):
         # reconstruct aggregation nodes
         self.nodes = self._create_nodes()
 
+    def draw_graph(self, log_dir, graph_name, view=False):
+        graph = Digraph()
+        for node_idx in range(self.num_nodes):
+            graph.node(str(node_idx))
+        for tail_node_idx, head_edge_tuples in self.adj_dict.items():
+            for head_node_idx, edge_idx in head_edge_tuples:
+                for op_name in self.edges[edge_idx].op_dict.keys():
+                    graph.edge(str(head_node_idx), str(tail_node_idx), label=op_name)
+        graph.render(os.path.join(log_dir, f"{graph_name}.pdf"), view=view)
+        graph.save(graph_name, log_dir)
+
     @property
     def edge_weights(self):
         edge_weights = torch.stack([edge.weight for edge in self.edges])
@@ -144,6 +158,13 @@ class GraphLayer(torch.nn.Module):
     @property
     def num_edges(self):
         return len(self.edges)
+
+    @property
+    def num_ops(self):
+        num_ops = 0
+        for edge in self.edges:
+            num_ops += edge.num_ops
+        return num_ops
 
 
 def drop_list_elements(old_list, idxs):

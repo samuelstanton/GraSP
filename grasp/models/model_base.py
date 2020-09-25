@@ -18,14 +18,14 @@ class ModelBase(object):
             self.model = get_network(network, depth, dataset)
 
     def get_ratio_at_each_layer(self):
-        assert self.masks is not None, 'Masks should be generated first.'
+        # assert self.masks is not None, 'Masks should be generated first.'
         res = dict()
         total_weights, total_params = 0, 0
         remained = 0
         # for m in self.masks.keys():
         for m in self.model.modules():
             if isinstance(m, (nn.Linear, nn.Conv2d, GraphEdge)):
-                mask = self.masks.get(m, None)
+                mask = self.masks.get(m, None) if self.masks else None
                 if mask is not None:
                     res[m] = (mask.sum() / mask.numel()).item() * 100
                     total_weights += mask.numel()
@@ -34,9 +34,8 @@ class ModelBase(object):
                     res[m] = 100.0
                     total_weights += m.weight.numel()
                     remained += m.weight.numel()
-            if hasattr(m, 'bias'):
-                if m.bias is not None:
-                    total_params += m.bias.numel()
+            if hasattr(m, 'bias') and m.bias is not None:
+                total_params += m.bias.numel()
         total_params += total_weights
 
         res['ratio'] = remained/total_weights * 100

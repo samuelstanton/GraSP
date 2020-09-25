@@ -1,3 +1,4 @@
+import os
 import torch
 import torch.autograd as autograd
 import torch.nn as nn
@@ -8,6 +9,7 @@ from collections import OrderedDict
 
 from grasp.models.base.graph_utils import GraphLayer, GraphEdge
 from grasp.models.base.graphnet import get_rand_op_masks
+from grasp.pruner.weight_mag import weight_mag_pruner
 
 
 def GraSP_fetch_data(dataloader, num_classes, samples_per_class):
@@ -163,8 +165,8 @@ def prune_ops(config, mb, trainloader, num_classes):
     target_ratio = config.target_op_ratio
     ratio = 1 - (1 - target_ratio) ** (1.0 / num_iterations)
     # ====================================== start pruning ======================================
-    if config.op_pruner.lower() == 'grasp':
-        for iteration in range(1):
+    for iteration in range(num_iterations):
+        if config.op_pruner.lower() == 'grasp':
             print("Iteration of: %d/%d" % (iteration + 1, num_iterations))
             device = 'cuda' if torch.cuda.is_available() else 'cpu'
             from grasp.pruner.GraSP import GraSP
@@ -173,14 +175,22 @@ def prune_ops(config, mb, trainloader, num_classes):
                           samples_per_class=config.samples_per_class,
                           num_iters=config.get('num_iters', 1),
                           mode='prune_ops')
-    elif config.op_pruner == 'random':
-        masks = get_rand_op_masks(mb.model, config.target_op_ratio)
-    else:
-        raise RuntimeError("unrecognized operation pruner")
-    masks = copy.deepcopy(masks)
+        elif config.op_pruner.lower() == 'weight_mag':
+            masks = weight_mag_pruner(mb.model, ratio, mode='prune_ops')
+        elif config.op_pruner.lower() == 'random':
+            masks = get_rand_op_masks(mb.model, ratio)
+        else:
+            raise RuntimeError("unrecognized operation pruner")
+
+        for layer in mb.model.modules():
+            if isinstance(layer, GraphLayer):
+                edge_masks = [masks.popitem(last=False)[1].bool() for _ in layer.edges]
+                layer.sparsify(edge_masks)
+
+    stage_count = 0
     for layer in mb.model.modules():
         if isinstance(layer, GraphLayer):
-            edge_masks = [masks.popitem()[1].bool() for _ in layer.edges]
-            layer.sparsify(edge_masks)
+            layer.draw_graph(os.getcwd(), f"stage_{stage_count}_graph", view=config.view_graphs)
+            stage_count += 1
     return mb
 
