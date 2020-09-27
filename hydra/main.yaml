@@ -1,4 +1,5 @@
 project_name: GraSP
+project_version: 0.0.1
 defaults:
   - dataset: cifar10
   - network: graphnet
@@ -6,13 +7,13 @@ defaults:
 
 op_pruner:
   type: grasp
-  target_ratio: 0.75
+  target_percent: 75
   num_iter: 1
   samples_per_class: 10
 
 weight_pruner:
   type: grasp
-  target_ratio: 0.
+  target_percent: 0
   samples_per_class: 10
 
 optimizer:
@@ -29,7 +30,7 @@ view_graphs: False
 
 # Directories for loading and storing data
 data_dir: data
-exp_name: test_experiment
+exp_name: ${network.type}${network.params.depth}.${op_pruner.target_percent}.${weight_pruner.target_percent}_${dataset.name}
 log_dir: ${data_dir}/experiments/${exp_name}/trial_${trial_id}/${now:%Y-%m-%d_%H-%M-%S}
 checkpoint_dir: ${log_dir}/checkpoints
 

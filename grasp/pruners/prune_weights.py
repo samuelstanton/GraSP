@@ -6,7 +6,7 @@ from grasp.pruners.weight_mag import weight_mag_pruner
 
 def prune_weights(config, mb, trainloader):
     pruner_type = config.weight_pruner.type.lower()
-    ratio = config.target_weight_ratio
+    ratio = config.weight_pruner.target_percent / 100
     assert ratio > 0.
     if pruner_type == 'grasp':
         device = 'cuda' if torch.cuda.is_available() else 'cpu'

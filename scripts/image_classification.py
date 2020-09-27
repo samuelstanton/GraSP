@@ -45,7 +45,7 @@ def main(config):
                   'init', 'pruning_metrics')
 
     print("==== pruning ops ====")
-    if config.op_pruner.target_ratio > 0. and isinstance(model_base.model, GraphNet):
+    if config.op_pruner.target_percent > 0. and isinstance(model_base.model, GraphNet):
         model_base = pruners.prune_ops(config, model_base, trainloader)
         rel_grad_norm = 1. if config.debug else get_grad_norm(model_base.model, trainloader.dataset,
                                                               norm_factor=abs_grad_norm)
@@ -53,7 +53,7 @@ def main(config):
                   'prune_ops', 'pruning_metrics')
 
     print("==== pruning weights ====")
-    if config.weight_pruner.target_ratio > 0.:
+    if config.weight_pruner.target_percent > 0.:
         model_base = pruners.prune_weights(config, model_base, trainloader)
         rel_grad_norm = 1. if config.debug else get_grad_norm(model_base.model, trainloader.dataset,
                                                               norm_factor=abs_grad_norm)

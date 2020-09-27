@@ -10,7 +10,7 @@ from grasp.pruners.weight_mag import weight_mag_pruner
 def prune_ops(config, mb, trainloader):
     pruner_type = config.op_pruner.type.lower()
     num_iterations = config.op_pruner.num_iter
-    target_ratio = config.op_pruner.target_ratio
+    target_ratio = config.op_pruner.target_percent / 100
     ratio = 1 - (1 - target_ratio) ** (1.0 / num_iterations)
     # ====================================== start pruning ======================================
     for iteration in range(num_iterations):
