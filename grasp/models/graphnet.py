@@ -2,9 +2,9 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 from collections import OrderedDict
-from .graph_utils import GraphEdge, GraphLayer
+from grasp.utils.graph_utils import GraphEdge, GraphLayer
 from .primitive_ops import Identity, FactorizedReduce, ReLUConvBN
-from .init_utils import weights_init
+from grasp.utils.init_utils import weights_init
 
 
 __all__ = ['graphnet']
@@ -28,8 +28,10 @@ def graphnet(depth=32, dataset='cifar10'):
 
 
 class GraphNet(nn.Module):
-    def __init__(self, num_blocks, num_classes=10):
+    def __init__(self, depth, num_classes):
         super().__init__()
+        assert (depth - 2) % 6 == 0, "GraphNet (depth - 2) must be divisible by 6"
+        num_blocks = [(depth - 2) // 6] * 3
         num_planes = [32, 64, 128]
         num_nodes = [3 * n for n in num_blocks]
         self.in_planes = num_planes[0]

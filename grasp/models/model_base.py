@@ -1,9 +1,37 @@
 import torch.nn as nn
 from collections import OrderedDict
-from grasp.utils.network_utils import get_network
+import hydra
+
 from grasp.utils.prune_utils import filter_weights
-from grasp.models.base.graph_utils import GraphEdge
-from grasp.models.base.primitive_ops import Identity
+from grasp.utils.graph_utils import GraphEdge
+from grasp.models.primitive_ops import Identity
+from grasp.utils.common_utils import try_cuda
+from grasp.utils.init_utils import weights_init
+from grasp.models import VGG, ResNet
+from grasp.models.resnet import BasicBlock
+
+
+def get_network(hydra_cfg):
+    if hydra_cfg.network.type == 'vgg':
+        print('Network: VGG, BatchNorm Status: %s' % hydra_cfg.network.params.batchnorm)
+        return VGG(dataset=str(hydra_cfg.dataset), **hydra_cfg.network.params)
+    elif hydra_cfg.network.type == 'resnet':
+        return ResNet(BasicBlock, **hydra_cfg.network.params)
+    elif hydra_cfg.network.type == 'graphnet':
+        return hydra.utils.instantiate(hydra_cfg.network)
+    else:
+        raise NotImplementedError('Network unsupported ' + str(hydra_cfg.network))
+
+
+def get_model_base(hydra_cfg):
+    network = get_network(hydra_cfg)
+    network_type = hydra_cfg.network.type
+    network_depth = hydra_cfg.network.params.depth
+    dataset_name = hydra_cfg.dataset.name
+    model_base = ModelBase(network_type, network_depth, dataset_name, network)
+    model_base = try_cuda(model_base)
+    model_base.model.apply(weights_init)
+    return model_base
 
 
 class ModelBase(object):

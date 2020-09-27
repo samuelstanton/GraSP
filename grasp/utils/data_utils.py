@@ -1,6 +1,8 @@
 import torch
 import torchvision
 import torchvision.transforms as transforms
+import os
+import hydra
 
 
 def get_transforms(dataset):
@@ -87,36 +89,40 @@ def get_transforms(dataset):
     return transform_train, transform_test
 
 
-def get_dataloader(dataset, train_batch_size, test_batch_size, num_workers=2, root='../data', subsample_ratio=1.0):
-    transform_train, transform_test = get_transforms(dataset)
+def get_dataloader(dataset_name, train_batch_size, test_batch_size, num_workers=2, dataset_dir='./data',
+                   subsample_ratio=1.0, **kwargs):
+    transform_train, transform_test = get_transforms(dataset_name)
+    dataset_dir = os.path.join(hydra.utils.get_original_cwd(), dataset_dir)
+    dataset_dir = os.path.normpath(dataset_dir)
+
     trainset, testset = None, None
-    if dataset == 'mnist':
-        trainset = torchvision.datasets.MNIST(root=root, train=True, download=True, transform=transform_train)
-        testset = torchvision.datasets.MNIST(root=root, train=False, download=True, transform=transform_test)
+    if dataset_name == 'mnist':
+        trainset = torchvision.datasets.MNIST(root=dataset_dir, train=True, download=True, transform=transform_train)
+        testset = torchvision.datasets.MNIST(root=dataset_dir, train=False, download=True, transform=transform_test)
 
-    if dataset == 'cifar10':
-        trainset = torchvision.datasets.CIFAR10(root=root, train=True, download=True, transform=transform_train)
-        testset = torchvision.datasets.CIFAR10(root=root, train=False, download=True, transform=transform_test)
+    if dataset_name == 'cifar10':
+        trainset = torchvision.datasets.CIFAR10(root=dataset_dir, train=True, download=True, transform=transform_train)
+        testset = torchvision.datasets.CIFAR10(root=dataset_dir, train=False, download=True, transform=transform_test)
 
-    if dataset == 'cifar100':
-        trainset = torchvision.datasets.CIFAR100(root=root, train=True, download=True, transform=transform_train)
-        testset = torchvision.datasets.CIFAR100(root=root, train=False, download=True, transform=transform_test)
+    if dataset_name == 'cifar100':
+        trainset = torchvision.datasets.CIFAR100(root=dataset_dir, train=True, download=True, transform=transform_train)
+        testset = torchvision.datasets.CIFAR100(root=dataset_dir, train=False, download=True, transform=transform_test)
 
-    if dataset == 'cinic-10':
-        trainset = torchvision.datasets.ImageFolder(root + '/cinic-10/trainval', transform=transform_train)
-        testset = torchvision.datasets.ImageFolder(root + '/cinic-10/test', transform=transform_test)
+    if dataset_name == 'cinic-10':
+        trainset = torchvision.datasets.ImageFolder(dataset_dir + '/cinic-10/trainval', transform=transform_train)
+        testset = torchvision.datasets.ImageFolder(dataset_dir + '/cinic-10/test', transform=transform_test)
 
-    if dataset == 'tiny_imagenet':
+    if dataset_name == 'tiny_imagenet':
         num_workers = 16
-        trainset = torchvision.datasets.ImageFolder(root + '/tiny_imagenet/train', transform=transform_train)
-        testset = torchvision.datasets.ImageFolder(root + '/tiny_imagenet/val', transform=transform_test)
+        trainset = torchvision.datasets.ImageFolder(dataset_dir + '/train', transform=transform_train)
+        testset = torchvision.datasets.ImageFolder(dataset_dir + '/val', transform=transform_test)
 
-    if dataset == 'imagenet':
+    if dataset_name == 'imagenet':
         num_workers = 16
-        trainset = torchvision.datasets.ImageFolder(root + '/ImageNet/train', transform=transform_train)
-        testset = torchvision.datasets.ImageFolder(root + '/ImageNet/val', transform=transform_test)
+        trainset = torchvision.datasets.ImageFolder(dataset_dir + '/train', transform=transform_train)
+        testset = torchvision.datasets.ImageFolder(dataset_dir + '/val', transform=transform_test)
 
-    assert trainset is not None and testset is not None, 'Error, no dataset %s' % dataset
+    assert trainset is not None and testset is not None, 'Error, no dataset %s' % dataset_name
 
     if subsample_ratio < 1.0:
         num_train = int(len(trainset) * subsample_ratio)

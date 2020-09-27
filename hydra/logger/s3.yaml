@@ -1,0 +1,5 @@
+logger:
+  class: upcycle.logging.S3Logger
+  params:
+    log_dir: SamuelS/${project_name}/${log_dir}
+    bucket_name: mnemosyne-team-bucket

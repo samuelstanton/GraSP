@@ -1,6 +1,6 @@
 import torch.nn as nn
 import torch.nn.functional as F
-from .init_utils import weights_init
+from grasp.utils.init_utils import weights_init
 
 __all__ = ['resnet']  # , 'resnet20', 'resnet32', 'resnet44', 'resnet56', 'resnet110', 'resnet1202']
 _AFFINE = True
@@ -46,8 +46,10 @@ class BasicBlock(nn.Module):
 
 
 class ResNet(nn.Module):
-    def __init__(self, block, num_blocks, num_classes=10):
+    def __init__(self, block, depth, num_classes):
         super(ResNet, self).__init__()
+        assert (depth - 2) % 6 == 0, "GraphNet (depth - 2) must be divisible by 6"
+        num_blocks = [(depth - 2) // 6] * 3
         _outputs = [32, 64, 128]
         self.in_planes = _outputs[0]
 

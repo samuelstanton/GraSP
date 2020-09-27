@@ -1,6 +1,6 @@
 import torch
 from torch import nn
-from grasp.models.base.graph_utils import GraphLayer
+from grasp.utils.graph_utils import GraphLayer, GraphEdge
 from collections import OrderedDict
 
 
@@ -23,7 +23,10 @@ def weight_mag_pruner(net, ratio, mode='prune_weights'):
     print("==== computing weight scores ====")
     scores = OrderedDict()
     for module, weight in zip(prunable_modules, weights):
-        scores[module] = weight.abs()
+        if isinstance(module, GraphEdge):
+            scores[module] = weight.exp()
+        else:
+            scores[module] = weight.abs()
     # Gather all scores in a single vector and normalise
     all_scores = torch.cat([torch.flatten(x) for x in scores.values()])
     norm_factor = all_scores.max() + eps

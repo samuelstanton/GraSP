@@ -1,0 +1,8 @@
+dataset:
+  name: imagenet
+  num_classes: 1000
+  dataset_dir: ${data_dir}/ImageNet
+  subsample_ratio: 1.0
+  num_workers: 16
+  train_batch_size: 250
+  test_batch_size: 250

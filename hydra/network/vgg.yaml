@@ -1,0 +1,9 @@
+network:
+  class: grasp.models.GraphNet
+  type: vgg
+  params:
+    depth: 19
+    num_classes: ${dataset.num_classes}
+    init_weights: True
+    affine: True
+    batchnorm: True

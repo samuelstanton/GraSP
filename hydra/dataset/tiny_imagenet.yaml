@@ -1,0 +1,6 @@
+dataset:
+  name: tiny_imagenet
+  num_classes: 200
+  dataset_dir: ${data_dir}/TinyImageNet
+  subsample_ratio: 1.0
+  num_workers: 16

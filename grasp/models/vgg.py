@@ -1,9 +1,7 @@
 import math
-import torch
 import torch.nn as nn
 
-from .init_utils import weights_init
-
+from grasp.utils.init_utils import weights_init
 
 
 defaultcfg = {
@@ -15,21 +13,13 @@ defaultcfg = {
 
 
 class VGG(nn.Module):
-    def __init__(self, dataset='cifar10', depth=19, init_weights=True, cfg=None, affine=True, batchnorm=True):
+    def __init__(self, dataset='cifar10', num_classes=10, depth=19, init_weights=True, cfg=None, affine=True, batchnorm=True):
         super(VGG, self).__init__()
         if cfg is None:
             cfg = defaultcfg[depth]
         self._AFFINE = affine
         self.feature = self.make_layers(cfg, batchnorm)
         self.dataset = dataset
-        if dataset == 'cifar10' or dataset == 'cinic-10':
-            num_classes = 10
-        elif dataset == 'cifar100':
-            num_classes = 100
-        elif dataset == 'tiny_imagenet':
-            num_classes = 200
-        else:
-            raise NotImplementedError("Unsupported dataset " + dataset)
         self.classifier = nn.Linear(cfg[-1], num_classes)
         if init_weights:
             self.apply(weights_init)

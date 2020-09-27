@@ -1,0 +1,5 @@
+dataset:
+  name: mnist
+  num_classes: 10
+  dataset_dir: ${data_dir}/MNIST
+  subsample_ratio: 1.0

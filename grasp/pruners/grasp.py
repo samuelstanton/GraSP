@@ -1,14 +1,10 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from grasp.utils.prune_utils import get_gradients
-from grasp.models.base.graph_utils import GraphEdge, GraphLayer
-from grasp.utils.common_utils import try_cuda
+from grasp.utils.network_utils import get_gradients
+from grasp.utils.graph_utils import GraphEdge, GraphLayer
 from collections import OrderedDict
-from grasp.pruner.weight_mag import weight_mag_pruner
 import copy
-
-from tqdm import tqdm
 
 
 def GraSP_fetch_data(dataloader, num_classes, samples_per_class):
@@ -50,32 +46,11 @@ def count_fc_parameters(net):
     return total
 
 
-def get_grad_norm(net, dataset, norm_factor=1.):
-    module_types = (nn.Conv2d, nn.Linear, GraphEdge)
-    weights = []
-    for m in net.modules():
-        if isinstance(m, module_types):
-            weights.append(m.weight)
-    grads = [torch.zeros_like(w) for w in weights]
-    net.zero_grad()
-    dataloader = torch.utils.data.DataLoader(dataset, batch_size=32)
-    for inputs, targets in tqdm(dataloader):
-        inputs, targets = try_cuda(inputs), try_cuda(targets)
-        logits = net(inputs)
-        loss = nn.functional.cross_entropy(logits, targets, reduction='sum') / len(dataset)
-        batch_grads = get_gradients(loss, weights, allow_unused=True, create_graph=False)
-        for i, batch_grad in enumerate(batch_grads):
-            grads[i] += batch_grad
-    abs_grad_norm = torch.stack([grad.pow(2).mean() for grad in grads]).mean().sqrt()
-    rel_grad_norm = (abs_grad_norm / norm_factor).item()
-    return rel_grad_norm
-
-
 def correct_grads(modules, weights, grads):
     corrected_grads = copy.deepcopy([g.detach() for g in grads])
     for i, (m, w, grad) in enumerate(zip(modules, weights, grads)):
         if isinstance(m, GraphEdge):
-            corrected_grads[i] = grad / (w.exp() ** 2)
+            corrected_grads[i] = grad / w.exp() ** 2
     return corrected_grads
 
 
@@ -83,7 +58,7 @@ def correct_hv_prods(modules, weights, grads, hv_prods):
     corrected_hv_prods = copy.deepcopy([hv.detach() for hv in hv_prods])
     for i, (m, w, g, hv) in enumerate(zip(modules, weights, grads, hv_prods)):
         if isinstance(m, GraphEdge):
-            corrected_hv_prods[i] = (hv - g ** 2 / w.exp() ** 2) / w.exp()
+            corrected_hv_prods[i] = (hv / w.exp()) - (g ** 2) / (w.exp() ** 3)
     return corrected_hv_prods
 
 
@@ -129,14 +104,13 @@ def GraSP(net, ratio, train_dataloader, device, num_classes=10, samples_per_clas
     for module, weight, hg_prod in zip(prunable_modules, weights, hess_grad_prods):
         if isinstance(module, GraphEdge):
             scores[module] = -weight.exp() * hg_prod
-            import pdb;
-            pdb.set_trace()
         else:
             scores[module] = -weight * hg_prod
-
+    # import pdb; pdb.set_trace()
 
     # Gather all scores in a single vector and normalise
     all_scores = torch.cat([torch.flatten(x) for x in scores.values()])
+    print(f"average score magnitude: {all_scores.abs().mean().item()}")
     norm_factor = torch.abs(torch.sum(all_scores)) + eps
     print("** norm factor:", norm_factor)
     all_scores.div_(norm_factor)
@@ -161,22 +135,3 @@ def GraSP(net, ratio, train_dataloader, device, num_classes=10, samples_per_clas
     print(torch.sum(torch.cat([torch.flatten(x == 1) for x in keep_masks.values()])))
 
     return keep_masks
-
-
-def prune_weights(config, mb, trainloader, num_classes):
-    ratio = config.target_weight_ratio
-    assert ratio > 0.
-    if config.pruner.lower() == 'grasp':
-        device = 'cuda' if torch.cuda.is_available() else 'cpu'
-        masks = GraSP(mb.model, ratio, trainloader, device,
-                      num_classes=num_classes,
-                      samples_per_class=config.samples_per_class,
-                      num_iters=config.get('num_iters', 1),
-                      mode='prune_weights')
-    elif config.pruner.lower() == 'weight_mag':
-        masks = weight_mag_pruner(mb.model, ratio, mode='prune_weights')
-    else:
-        raise RuntimeError('unsupported weight pruner')
-
-    mb.register_mask(masks)
-    return mb

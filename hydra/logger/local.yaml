@@ -1,0 +1,4 @@
+logger:
+  class: upcycle.logging.DataFrameLogger
+  params:
+    log_dir: ./

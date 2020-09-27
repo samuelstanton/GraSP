@@ -3,6 +3,7 @@ import math
 import torch
 from graphviz import Digraph
 
+
 class GraphNode(object):
     """Simple aggregation op"""
     def __init__(self, in_degree):
@@ -82,9 +83,9 @@ class GraphLayer(torch.nn.Module):
             stdv = 1. / math.sqrt(self.num_ops)
             for _, edge_idx in head_edge_tuple:
                 edge = self.edges[edge_idx]
-                # edge.weight.data.uniform_(-stdv, stdv)
-                edge.weight.data.uniform_(-1, 0)
-                # edge.weight.data = torch.ones_like(edge.weight) / tail_node.in_degree
+                # edge.weight.data.uniform_(-stdv, stdv)  # use this for linear op weights
+                edge.weight.data.uniform_(math.log(stdv / 2), math.log(stdv))
+
 
     def forward(self, inputs):
         node_features = [self.nodes[0]([inputs])]

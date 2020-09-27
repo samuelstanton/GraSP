@@ -1,0 +1,6 @@
+network:
+  class: grasp.models.ResNet
+  type: resnet
+  params:
+    depth: 20
+    num_classes: ${dataset.num_classes}

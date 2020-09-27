@@ -1,7 +1,7 @@
+from grasp.models.graphnet import GraphNet
+from grasp.models.vgg import VGG
+from grasp.models.resnet import ResNet
 from .model_base import ModelBase
-from .base.vgg import VGG
-from .base.resnet import ResNet
-from .base.graphnet import GraphNet
 
 
 __all__ = [
