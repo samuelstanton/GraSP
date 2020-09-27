@@ -30,12 +30,12 @@ view_graphs: False
 
 # Directories for loading and storing data
 data_dir: data
-exp_name: ${network.type}${network.params.depth}.${op_pruner.target_percent}.${weight_pruner.target_percent}_${dataset.name}
+exp_name: ${network.type}${network.params.depth}_${op_pruner.type}${op_pruner.target_percent}_${weight_pruner.type}${weight_pruner.target_percent}_${dataset.name}
 log_dir: ${data_dir}/experiments/${exp_name}/trial_${trial_id}/${now:%Y-%m-%d_%H-%M-%S}
 checkpoint_dir: ${log_dir}/checkpoints
 
 s3_bucket: mnemosyne-team-bucket
-s3_path: SamuelS/GraSP/${log_dir}
+s3_path: SamuelS/${project_name}/${log_dir}
 
 hydra:
   run:
