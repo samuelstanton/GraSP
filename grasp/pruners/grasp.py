@@ -62,8 +62,8 @@ def correct_hv_prods(modules, weights, grads, hv_prods):
     return corrected_hv_prods
 
 
-def GraSP(net, ratio, train_dataloader, device, num_classes=10, samples_per_class=25, num_iters=1, T=200, reinit=True,
-          mode='prune_weights'):
+def GraSP(net, ratio, train_dataloader, device, num_classes=10, samples_per_class=25, logit_scale=200,
+          mode='prune_weights', rank_by='val'):
     eps = 1e-10
     keep_ratio = 1-ratio
     net.zero_grad()
@@ -87,7 +87,7 @@ def GraSP(net, ratio, train_dataloader, device, num_classes=10, samples_per_clas
     print("==== computing gradients and Hessian-grad vector products ====")
     for inputs, targets in zip(inputs_by_class, targets_by_class):
         inputs, targets = inputs.to(device), targets.to(device)
-        scaled_logits = net(inputs) / T
+        scaled_logits = net(inputs) / logit_scale
         loss = F.cross_entropy(scaled_logits, targets, reduction='sum') / (num_classes * samples_per_class)
         grads = get_gradients(loss, weights, allow_unused=True, create_graph=True)
         corrected_grads = correct_grads(prunable_modules, weights, grads)
@@ -106,12 +106,13 @@ def GraSP(net, ratio, train_dataloader, device, num_classes=10, samples_per_clas
             scores[module] = -weight.exp() * hg_prod
         else:
             scores[module] = -weight * hg_prod
-    # import pdb; pdb.set_trace()
 
     # Gather all scores in a single vector and normalise
     all_scores = torch.cat([torch.flatten(x) for x in scores.values()])
     print(f"average score magnitude: {all_scores.abs().mean().item()}")
-    norm_factor = torch.abs(torch.sum(all_scores)) + eps
+    print(f"max score magnitude: {all_scores.abs().max().item()}")
+    print(f"min score magnitude: {all_scores.abs().min().item()}")
+    norm_factor = all_scores.abs().max() + eps
     print("** norm factor:", norm_factor)
     all_scores.div_(norm_factor)
 
@@ -120,18 +121,20 @@ def GraSP(net, ratio, train_dataloader, device, num_classes=10, samples_per_clas
     keep_masks = OrderedDict()
 
     # original GraSP masking rule
-    threshold, _ = torch.topk(all_scores, num_params_to_rm, sorted=True)
-    acceptable_score = threshold[-1]
-    for m, g in scores.items():
-        keep_masks[m] = ((g / norm_factor) <= acceptable_score).float()
+    if rank_by == 'val':
+        threshold, _ = torch.topk(all_scores, num_params_to_rm, sorted=True)
+        acceptable_score = threshold[-1]
+        for m, g in scores.items():
+            keep_masks[m] = ((g / norm_factor) <= acceptable_score).float()
 
     # GraSP-Magnitude scoring rule
-    # threshold, _ = torch.topk(-all_scores.abs(), num_params_to_rm, sorted=True)
-    # acceptable_score = -threshold[-1]
-    # for m, score in scores.items():
-    #     keep_masks[m] = ((score / norm_factor).abs() >= acceptable_score).float()
-    print('** accept: ', acceptable_score)
+    if rank_by == 'mag':
+        threshold, _ = torch.topk(-all_scores.abs(), num_params_to_rm, sorted=True)
+        acceptable_score = -threshold[-1]
+        for m, score in scores.items():
+            keep_masks[m] = ((score / norm_factor).abs() >= acceptable_score).float()
 
+    print('** accept: ', acceptable_score)
     print(torch.sum(torch.cat([torch.flatten(x == 1) for x in keep_masks.values()])))
 
     return keep_masks

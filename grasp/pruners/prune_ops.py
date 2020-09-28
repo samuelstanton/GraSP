@@ -14,14 +14,16 @@ def prune_ops(config, mb, trainloader):
     ratio = 1 - (1 - target_ratio) ** (1.0 / num_iterations)
     # ====================================== start pruning ======================================
     for iteration in range(num_iterations):
-        if pruner_type == 'grasp':
+        if 'grasp' in pruner_type:
+            _, rank_by = pruner_type.split('_')
             print("GraSP iteration: %d/%d" % (iteration + 1, num_iterations))
             device = 'cuda' if torch.cuda.is_available() else 'cpu'
             masks = GraSP(mb.model, ratio, trainloader, device,
                           num_classes=config.dataset.num_classes,
                           samples_per_class=config.op_pruner.samples_per_class,
-                          num_iters=1,
-                          mode='prune_ops')
+                          logit_scale=config.grasp_logit_scale,
+                          mode='prune_ops',
+                          rank_by=rank_by)
 
         elif pruner_type == 'weight_mag':
             masks = weight_mag_pruner(mb.model, ratio, mode='prune_ops')

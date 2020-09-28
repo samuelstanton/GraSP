@@ -5,7 +5,7 @@ cd ../BatchExperiments
 script_name="image_classification"
 batch_name="batch_sweep-op_pruner.type-op_pruner.target_percent-dataset"
 datasets=("cifar10" "cifar100")
-op_pruner_types=("grasp" "random" "weight_mag")
+op_pruner_types=("grasp_mag" "grasp_val")
 op_pruner_target_percents=(70 75 80 82 84 86 88 90 92 94)
 
 num_trials=3

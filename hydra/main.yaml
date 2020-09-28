@@ -6,13 +6,13 @@ defaults:
   - logger: local
 
 op_pruner:
-  type: grasp
+  type: grasp_mag
   target_percent: 75
   num_iter: 1
   samples_per_class: 10
 
 weight_pruner:
-  type: grasp
+  type: grasp_mag
   target_percent: 0
   samples_per_class: 10
 
@@ -21,6 +21,7 @@ optimizer:
   weight_decay: 1e-4
 
 num_train_epochs: 160
+grasp_logit_scale: 1
 
 trial_id: 0
 seed:

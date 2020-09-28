@@ -4,3 +4,4 @@ torchvision
 hydra-core==0.11.3
 graphviz
 tqdm
+git+git://github.com/samuelstanton/upcycle@master
